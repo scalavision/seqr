@@ -9,7 +9,7 @@ from django.db.models import Model, prefetch_related_objects
 from django.db.models.fields.files import ImageFieldFile
 
 from seqr.models import CAN_EDIT, Project, Family, Individual, Sample, SavedVariant, VariantTag, \
-    VariantFunctionalData, VariantNote, GeneNote
+    VariantFunctionalData, VariantNote, GeneNote, LocusList, LocusListInterval, AnalysisGroup
 from seqr.utils.xpos_utils import get_chrom_pos
 from seqr.views.utils.json_utils import _to_camel_case
 logger = logging.getLogger(__name__)
@@ -36,7 +36,10 @@ def _get_record_fields(model_class, model_type, user=None):
 
 
 def _get_json_for_record(record, fields):
-    return {_to_camel_case(field[0]): record.get(field[1]) for field in fields}
+    json = {_to_camel_case(field[0]): record.get(field[1]) for field in fields}
+    if json.get('createdBy'):
+        json['createdBy'] = json['createdBy'].get_full_name() or json['createdBy'].email
+    return json
 
 
 def _get_json_for_user(user):
@@ -149,7 +152,7 @@ def _get_json_for_individuals(individuals, user=None, project_guid=None, family_
     Args:
         individuals (array): array of dictionaries or django models for the individual.
         user (object): Django User object for determining whether to include restricted/internal-only fields
-        project_guid (boolean): An optional field to use as the projectGuid instead of querying the DB
+        project_guid (string): An optional field to use as the projectGuid instead of querying the DB
         family_guid (boolean): An optional field to use as the familyGuid instead of querying the DB
         add_sample_guids_field (boolean): A flag to indicate weather sample ids should be added
     Returns:
@@ -253,6 +256,49 @@ def _get_json_for_sample(sample, project_guid=None):
     return get_json_for_samples([sample], project_guid=project_guid)[0]
 
 
+def get_json_for_analysis_groups(analysis_groups, project_guid=None):
+    """Returns a JSON representation of the given list of AnalysisGroups.
+
+    Args:
+        analysis_groups (array): array of dictionary or django model for the AnalysisGroups.
+        project_guid (string): An optional field to use as the projectGuid instead of querying the DB
+    Returns:
+        array: array of json objects
+    """
+
+    fields = _get_record_fields(AnalysisGroup, 'analysis_group')
+    nested_fields = []
+    if not project_guid:
+        nested_fields.append(('project', 'guid'))
+
+    results = []
+    for group in analysis_groups:
+        record_dict = _record_to_dict(
+            group, fields, nested_fields=nested_fields
+        )
+
+        result = _get_json_for_record(record_dict, fields)
+        result.update({
+            'analysisGroupGuid': result.pop('guid'),
+            'projectGuid': project_guid or record_dict.get('project_guid'),
+            'familyGuids': [f.guid for f in group.families.only('guid').all()]
+        })
+        results.append(result)
+    return results
+
+
+def get_json_for_analysis_group(analysis_group, project_guid=None):
+    """Returns a JSON representation of the given AnalysisGroup.
+
+    Args:
+        analysis_group (object): dictionary or django model for the AnalysisGroup.
+        project_guid (string): An optional field to use as the projectGuid instead of querying the DB
+    Returns:
+        dict: json object
+    """
+
+    return get_json_for_analysis_groups([analysis_group], project_guid=project_guid)[0]
+
 def get_json_for_saved_variant(saved_variant, add_tags=False):
     """Returns a JSON representation of the given variant.
 
@@ -298,13 +344,11 @@ def get_json_for_variant_tag(tag):
     ])
 
     result = _get_json_for_record(tag_dict, fields)
-    created_by = result.pop('createdBy')
     result.update({
         'tagGuid': result.pop('guid'),
         'name': tag_dict['variant_tag_type_name'],
         'category': tag_dict['variant_tag_type_category'],
         'color': tag_dict['variant_tag_type_color'],
-        'createdBy': (created_by.get_full_name() or created_by.email) if created_by else None,
     })
     return result
 
@@ -323,13 +367,11 @@ def get_json_for_variant_functional_data(tag):
     result = _get_json_for_record(tag_dict, fields)
 
     display_data = json.loads(tag.get_functional_data_tag_display())
-    created_by = result.pop('createdBy')
     result.update({
         'tagGuid': result.pop('guid'),
         'name': result.pop('functionalDataTag'),
         'metadataTitle': display_data.get('metadata_title'),
         'color': display_data['color'],
-        'createdBy': (created_by.get_full_name() or created_by.email) if created_by else None,
     })
     return result
 
@@ -347,10 +389,8 @@ def get_json_for_variant_note(note):
     note_dict = _record_to_dict(note, fields)
     result = _get_json_for_record(note_dict, fields)
 
-    created_by = result.pop('createdBy')
     result.update({
         'noteGuid': result.pop('guid'),
-        'createdBy': (created_by.get_full_name() or created_by.email) if created_by else None,
     })
     return result
 
@@ -368,10 +408,76 @@ def get_json_for_gene_note(note, user):
     note_dict = _record_to_dict(note, fields)
     result = _get_json_for_record(note_dict, fields)
 
-    created_by = result.pop('createdBy')
     result.update({
         'noteGuid': result.pop('guid'),
-        'createdBy': (created_by.get_full_name() or created_by.email) if created_by else None,
-        'editable': user.is_staff or user == created_by,
+        'editable': user.is_staff or user == note.created_by,
     })
     return result
+
+
+def get_json_for_locus_lists(locus_lists, user, include_genes=False):
+    """Returns a JSON representation of the given LocusLists.
+
+    Args:
+        locus_lists (array): array of LocusList django models.
+    Returns:
+        array: json objects
+    """
+
+    fields = _get_record_fields(LocusList, 'locus_list')
+    results = []
+    for locus_list in locus_lists:
+        locus_list_dict = _record_to_dict(locus_list, fields)
+        result = _get_json_for_record(locus_list_dict, fields)
+        gene_set = locus_list.locuslistgene_set
+        interval_set = locus_list.locuslistinterval_set
+        if include_genes:
+            intervals = get_json_for_locus_list_intervals(interval_set.all())
+            genome_versions = {interval['genomeVersion'] for interval in intervals}
+            result.update({
+                'items': [{'geneId': gene.gene_id} for gene in gene_set.all()] + intervals,
+                'intervalGenomeVersion': genome_versions.pop() if len(genome_versions) == 1 else None,
+            })
+        result.update({
+            'locusListGuid': result.pop('guid'),
+            'numEntries': gene_set.count() + interval_set.count(),
+            'canEdit': user == locus_list.created_by,
+        })
+        results.append(result)
+
+    return results
+
+
+def get_json_for_locus_list(locus_list, user):
+    """Returns a JSON representation of the given LocusList.
+
+    Args:
+        locus_list (object): LocusList django model.
+    Returns:
+        dict: json object
+    """
+    return get_json_for_locus_lists([locus_list], user, include_genes=True)[0]
+
+
+def get_json_for_locus_list_intervals(locus_list_intervals):
+    """Returns a JSON representation of the given LocusLists.
+
+    Args:
+        locus_list_intervals (array): array of LocusListInterval django models.
+    Returns:
+        array: json objects
+    """
+
+    fields = _get_record_fields(LocusListInterval, 'locus_list_interval')
+    results = []
+    for locus_list_interval in locus_list_intervals:
+        locus_list_interval_dict = _record_to_dict(locus_list_interval, fields)
+        result = _get_json_for_record(locus_list_interval_dict, fields)
+        result.update({
+            'locusListIntervalGuid': result.pop('guid'),
+        })
+        results.append(result)
+
+    return results
+
+

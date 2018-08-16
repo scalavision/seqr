@@ -2,13 +2,14 @@ import React from 'react'
 import PropTypes from 'prop-types'
 import DocumentTitle from 'react-document-title'
 import { connect } from 'react-redux'
+import { Route, Switch, NavLink } from 'react-router-dom'
 import styled from 'styled-components'
 import { Grid, Breadcrumb } from 'semantic-ui-react'
-import { NavLink } from 'react-router-dom'
 
-import { getUser, getFamiliesByGuid } from 'redux/selectors'
-import { getProject } from 'pages/Project/selectors'
-import EditProjectButton from '../buttons/EditProjectButton'
+import ProjectPageHeader from 'pages/Project/components/PageHeader'
+import { LocusListPageHeader } from 'pages/LocusLists'
+import { getGenesById } from 'redux/selectors'
+import { snakecaseToTitlecase } from '../../utils/stringUtils'
 
 
 const PageHeaderRow = styled(Grid.Row)`
@@ -30,87 +31,35 @@ const BreadcrumbContainer = styled.div`
     cursor: auto !important;
   }
 `
-const NavLinkNoActive = styled(NavLink)`
-  &.active {
-    display: none;
-  }
-`
 
-const PageHeader = ({ user, project, familiesByGuid, match }) => {
-  if (!project || !match) {
-    return null
-  }
-
-  let originalPageLink
-  const BREADCRUMBS = {
-    project_page: {
-      breadcrumb: false,
-      originalPages: [{ name: 'Project', path: '' }, { name: 'Families', path: 'families' }],
-    },
-    family_page: {
-      breadcrumb: false,
-      breadcrumbIdParsers: [
-        (breadcrumbId) => {
-          const { familyId } = familiesByGuid[breadcrumbId] || {}
-          originalPageLink = `family/${familyId}`
-          return { content: `Family: ${familyId || breadcrumbId}`, link: match.url }
-        },
-      ],
-      originalPages: [{ name: 'Family' }],
-    },
-    saved_variants: {
-      breadcrumbIdParsers: [
-        (breadcrumbId) => {
-          if (breadcrumbId === 'family' || breadcrumbId === 'variant') { return { content: null } }
-          originalPageLink = `variants/${breadcrumbId}`
-          return null
-        },
-        (breadcrumbId) => {
-          if (breadcrumbId.startsWith('SV')) {
-            originalPageLink = false
-            return { content: 'Variant', link: match.url }
-          }
-          const { familyId } = familiesByGuid[breadcrumbId] || {}
-          originalPageLink = `saved-variants?family=${familyId}`
-          return {
-            content: `Family: ${familyId || breadcrumbId}`,
-            link: `/project/${project.projectGuid}/saved_variants/family/${breadcrumbId}`,
-          }
-        },
-        (breadcrumbId) => {
-          originalPageLink = `variants/${breadcrumbId}?${originalPageLink.split('?')[1]}`
-          return null
-        },
-      ],
-      originalPages: [{ path: 'saved-variants' }],
-    },
-  }
-
-  const {
-    breadcrumb = match.params.breadcrumb.split('_').map(word => word[0].toUpperCase() + word.slice(1)).join(' '),
-    breadcrumbIdParsers = [],
-    originalPages = [],
-  } = BREADCRUMBS[match.params.breadcrumb] || {}
-
+export const PageHeaderLayout = ({
+  entity, entityGuid, breadcrumb, breadcrumbId, breadcrumbIdSections, title, header, entityLinkPath, entityGuidLinkPath,
+  entityLinks, originalPages = [], originalPagePath = '', button, description,
+}) => {
   let breadcrumbSections = [
-    { content: 'Project' },
-    { content: project.name, link: `/project/${project.projectGuid}/project_page` },
+    { content: snakecaseToTitlecase(entity), link: entityLinkPath === undefined ? `/${entity}` : entityLinkPath },
   ]
-  if (breadcrumb !== false) {
-    breadcrumbSections.push({
-      content: breadcrumb,
-      link: `/project/${project.projectGuid}/${match.params.breadcrumb}`,
-    })
+  if (entityGuid) {
+    breadcrumbSections.push(
+      { content: title || entityGuid, link: `/${entity}/${entityGuid}${entityGuidLinkPath ? `/${entityGuidLinkPath}` : ''}` },
+    )
   }
-  if (match.params.breadcrumbId) {
-    const breadcrumbIds = match.params.breadcrumbId.split('/')
-    breadcrumbSections = breadcrumbSections.concat(breadcrumbIds.map((breadcrumbId, i) => {
-      const defaultIdBreadcrumb = {
-        content: breadcrumbId,
-        link: `/project/${project.projectGuid}/${match.params.breadcrumb}/${breadcrumbIds.slice(0, i + 1).join('/')}`,
-      }
-      return breadcrumbIdParsers[i] ? breadcrumbIdParsers[i](breadcrumbId) || defaultIdBreadcrumb : defaultIdBreadcrumb
-    }))
+  if (breadcrumbIdSections) {
+    breadcrumbSections = breadcrumbSections.concat(breadcrumbIdSections)
+  } else if (breadcrumb) {
+    breadcrumbSections.push({
+      content: snakecaseToTitlecase(breadcrumb),
+      link: `/${entity}/${entityGuid}/${breadcrumb}`,
+    })
+    if (breadcrumbId) {
+      const breadcrumbIds = breadcrumbId.split('/')
+      breadcrumbSections = breadcrumbSections.concat(breadcrumbIds.map((breadcrumbIdSection, i) => (
+        {
+          content: breadcrumbIdSection,
+          link: `/${entity}/${entityGuid}/${breadcrumb}/${breadcrumbIds.slice(0, i + 1).join('/')}`,
+        }
+      )))
+    }
   }
 
   const breadcrumbs = breadcrumbSections.reduce(
@@ -130,7 +79,7 @@ const PageHeader = ({ user, project, familiesByGuid, match }) => {
   )
   return (
     <PageHeaderRow>
-      <DocumentTitle key="title" title={`${breadcrumb || 'seqr'}: ${project.name}`} />
+      <DocumentTitle key="title" title={header || `${breadcrumb || 'seqr'}: ${title || snakecaseToTitlecase(entity)}`} />
       <Grid.Column width={1} />
       <Grid.Column width={11}>
         <BreadcrumbContainer>
@@ -139,55 +88,83 @@ const PageHeader = ({ user, project, familiesByGuid, match }) => {
           </Breadcrumb>
         </BreadcrumbContainer>
         {
-          project.description &&
+          description &&
           <div style={{ fontWeight: 300, fontSize: '16px', margin: '0px 30px 20px 5px', display: 'inline-block' }}>
-            {project.description}
+            {description}
           </div>
         }
-        <EditProjectButton />
+        {button}
       </Grid.Column>
       <Grid.Column width={3}>
-        {
-          project.hasGeneSearch &&
-          <b><a href={`/project/${project.deprecatedProjectId}/gene`}><br />Gene Search<br /></a></b>
-        }
-        {
-          user.is_staff &&
-            <NavLinkNoActive to={`/project/${project.projectGuid}/case_review`}>
-              <b>Case Review</b><br />
-            </NavLinkNoActive>
+        {entityLinks &&
+          <b><br />
+            {entityLinks.map(({ text, href, ...linkProps }) =>
+              <div key={text}>{href ? <a href={href}>{text}</a> : <NavLink {...linkProps}>{text}</NavLink>}</div>,
+            )}
+          </b>
         }
         <br />
-        {originalPageLink !== false && originalPages.map(page =>
-          <a
-            key={page.name || match.params.breadcrumb}
-            href={`/project/${project.deprecatedProjectId}/${originalPageLink || page.path}`}
-          >
-            Deprecated {page.name || breadcrumb} Page<br />
-          </a>,
-        )}
+        {originalPages.map((page) => {
+          const linkTitle = page.name || snakecaseToTitlecase(entity)
+          return (
+            <a key={linkTitle} href={`/${originalPagePath}${originalPagePath ? '/' : ''}${page.path}`}>
+              Deprecated {linkTitle} Page <br />
+            </a>
+          )
+        })}
         <br />
-        <a href="/gene-lists">Gene Lists</a><br />
-        <a href="/gene">Gene Summary Information</a><br />
-        {/*<a href={computeVariantSearchUrl(props.project.projectGuid)}>Variant Search</a>*/}
       </Grid.Column>
       <Grid.Column width={1} />
     </PageHeaderRow>
   )
 }
 
-PageHeader.propTypes = {
-  user: PropTypes.object,
-  project: PropTypes.object,
-  familiesByGuid: PropTypes.object,
+PageHeaderLayout.propTypes = {
+  entity: PropTypes.string.isRequired,
+  entityGuid: PropTypes.string,
+  breadcrumb: PropTypes.string,
+  breadcrumbId: PropTypes.string,
+  breadcrumbIdSections: PropTypes.array,
+  title: PropTypes.string,
+  header: PropTypes.string,
+  entityLinkPath: PropTypes.string,
+  entityGuidLinkPath: PropTypes.string,
+  entityLinks: PropTypes.array,
+  originalPages: PropTypes.array,
+  originalPagePath: PropTypes.string,
+  button: PropTypes.node,
+  description: PropTypes.string,
+}
+
+
+const originalGenePage = geneId => [{ path: geneId || '' }]
+
+const BaseGenePageHeader = ({ gene, match }) =>
+  <PageHeaderLayout
+    entity="gene_info"
+    entityGuid={match.params.geneId}
+    title={match.params.geneId && (gene ? gene.symbol : match.params.geneId)}
+    originalPagePath="gene"
+    originalPages={originalGenePage(match.params.geneId)}
+  />
+
+BaseGenePageHeader.propTypes = {
+  gene: PropTypes.object,
   match: PropTypes.object,
 }
 
-const mapStateToProps = state => ({
-  user: getUser(state),
-  project: getProject(state),
-  familiesByGuid: getFamiliesByGuid(state),
+const mapStateToProps = (state, ownProps) => ({
+  gene: getGenesById(state)[ownProps.match.params.geneId],
 })
 
-export default connect(mapStateToProps, null, null, { pure: false })(PageHeader)
+export const GenePageHeader = connect(mapStateToProps)(BaseGenePageHeader)
 
+export default () =>
+  <Switch>
+    <Route path="/dashboard" component={() => null} />
+    <Route path="/project/:projectGuid/saved_variants/:variantPage?/:breadcrumbId?/:tag?" component={({ match }) => <ProjectPageHeader match={match} breadcrumb="saved_variants" />} />
+    <Route path="/project/:projectGuid/:breadcrumb/:breadcrumbId*" component={ProjectPageHeader} />
+    <Route path="/gene_lists/:locusListGuid?" component={LocusListPageHeader} />
+    <Route path="/gene_info/:geneId?" component={GenePageHeader} />
+    <Route path="/:entity/:entityGuid?/:breadcrumb?/:breadcrumbId*" component={({ match }) => <PageHeaderLayout {...match.params} />} />
+  </Switch>

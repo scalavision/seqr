@@ -47,14 +47,14 @@ urlpatterns = [
     url(r'^project/(?P<project_id>[\w.|-]+)/variants/(?P<tag>[^/]+)$', xbrowse_server.base.views.project_views.variants_with_tag, name='variants_with_tag'),  # DEPRECATED
 
     url(r'^project/(?P<project_id>[\w.|-]+)/settings$', xbrowse_server.base.views.project_settings, name='project_settings'),  # DEPRECATED
-    url(r'^project/(?P<project_id>[\w.|-]+)/project_gene_list_settings', xbrowse_server.base.views.project_gene_list_settings, name='project_gene_list_settings'),
+    url(r'^project/(?P<project_id>[\w.|-]+)/project_gene_list_settings', xbrowse_server.base.views.project_gene_list_settings, name='project_gene_list_settings'),  # DEPRECATED
     url(r'^project/(?P<project_id>[\w.|-]+)/collaborators', xbrowse_server.base.views.project_collaborators, name='project_collaborators'),
     url(r'^project/(?P<project_id>[\w.|-]+)/settings/add-collaborator$', xbrowse_server.base.views.add_collaborator, name='add_collaborator'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/settings/add-gene-list', xbrowse_server.base.views.add_gene_list, name='add_gene_list'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/gene-list/(?P<gene_list_slug>[\w|-]+)$', xbrowse_server.base.views.project_gene_list, name='project_gene_list'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/gene-list/(?P<gene_list_slug>[\w|-]+)/download$', xbrowse_server.base.views.project_gene_list_download, name='project_gene_list_download'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/gene-list/(?P<gene_list_slug>[\w|-]+)/remove', xbrowse_server.base.views.remove_gene_list, name='project_remove_gene_list'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/settings/remove-gene-list', xbrowse_server.base.views.remove_gene_list, name='remove_gene_list'),
+    url(r'^project/(?P<project_id>[\w.|-]+)/settings/add-gene-list', xbrowse_server.base.views.add_gene_list, name='add_gene_list'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/gene-list/(?P<gene_list_slug>[\w|-]+)$', xbrowse_server.base.views.project_gene_list, name='project_gene_list'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/gene-list/(?P<gene_list_slug>[\w|-]+)/download$', xbrowse_server.base.views.project_gene_list_download, name='project_gene_list_download'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/gene-list/(?P<gene_list_slug>[\w|-]+)/remove', xbrowse_server.base.views.remove_gene_list, name='project_remove_gene_list'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/settings/remove-gene-list', xbrowse_server.base.views.remove_gene_list, name='remove_gene_list'),  # DEPRECATED
 
     url(r'^project/(?P<project_id>[\w.|-]+)/edit-individuals$', xbrowse_server.base.views.edit_individuals, name='edit_individuals'),  # DEPRECATED
     url(r'^project/(?P<project_id>[\w.|-]+)/save-all-individuals', xbrowse_server.base.views.save_all_individuals, name='save_all_individuals'),  # DEPRECATED
@@ -107,18 +107,19 @@ urlpatterns = [
     #
     # Family group views
     #
-    url(r'^project/(?P<project_id>[\w.|-]+)/family-groups$', xbrowse_server.base.views.family_group_views.family_groups, name='family_groups'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/add-family-group$', xbrowse_server.base.views.family_group_views.add_family_group, name='add_family_group'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/add-family-group-submit$', xbrowse_server.base.views.family_group_views.add_family_group_submit, name='add_family_group_submit'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)$', xbrowse_server.base.views.family_group_views.family_group_home, name='family_group_home'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)/edit$', xbrowse_server.base.views.family_group_views.family_group_edit, name='family_group_edit'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)/delete$', xbrowse_server.base.views.family_group_views.delete, name='family_group_delete'),
+
+    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/guid/(?P<family_group_guid>[\w.|-]+)/(?P<path>[\w.|-]+)?$', xbrowse_server.base.views.family_group_views.redirect_family_group_guid),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/family-groups$', xbrowse_server.base.views.family_group_views.family_groups, name='family_groups'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/add-family-group$', xbrowse_server.base.views.family_group_views.add_family_group, name='add_family_group'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/add-family-group-submit$', xbrowse_server.base.views.family_group_views.add_family_group_submit, name='add_family_group_submit'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)$', xbrowse_server.base.views.family_group_views.family_group_home, name='family_group_home'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)/edit$', xbrowse_server.base.views.family_group_views.family_group_edit, name='family_group_edit'),  # DEPRECATED
+    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)/delete$', xbrowse_server.base.views.family_group_views.delete, name='family_group_delete'),  # DEPRECATED
     url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)/combine-mendelian-families$', xbrowse_server.base.views.family_group_views.combine_mendelian_families, name='combine_mendelian_families'),
-    url(r'^project/(?P<project_id>[\w.|-]+)/family-group/(?P<family_group_slug>[\w.|-]+)/gene/(?P<gene_id>[\w|-]+)$', xbrowse_server.base.views.family_group_views.family_group_gene, name='family_group_gene'),
 
     url(r'', include('seqr.urls')),
     url(r'^api/', include('xbrowse_server.api.urls')),
-    url(r'^gene-lists/', include(xbrowse_server.gene_lists.urls)),
+    url(r'^gene-lists/', include(xbrowse_server.gene_lists.urls)),  # DEPRECATED
 
     url(r'^staff/', include(xbrowse_server.staff.urls)),
 
@@ -132,7 +133,7 @@ urlpatterns = [
 
     url(r'^errorlog$', xbrowse_server.base.views.account_views.errorlog, name='errorlog'),
 
-    url(r'^gene$', xbrowse_server.base.views.reference_views.gene_search, name='gene_search'),  # DEPRECATED
+    url(r'^gene/?$', xbrowse_server.base.views.reference_views.gene_search, name='gene_search'),  # DEPRECATED
     url(r'^gene/(?P<gene_str>[\S]+)/?$', xbrowse_server.base.views.reference_views.gene_info, name='gene_info'),  # DEPRECATED
 
     #

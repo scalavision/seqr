@@ -710,6 +710,9 @@ class LocusList(ModelWithGUID):
 
     class Meta:
         permissions = _SEQR_OBJECT_PERMISSIONS
+        unique_together = ('name', 'description', 'is_public', 'created_by')
+
+        json_fields = ['guid', 'created_by', 'created_date', 'last_modified_date', 'name', 'description', 'is_public']
 
 
 class LocusListGene(ModelWithGUID):
@@ -748,17 +751,24 @@ class LocusListInterval(ModelWithGUID):
     class Meta:
         unique_together = ('locus_list', 'genome_version', 'chrom', 'start', 'end')
 
+        json_fields = ['guid', 'genome_version', 'chrom', 'start', 'end']
 
-"""
-class FamilyGroup(ModelWithGUID):
-    project = models.ForeignKey(Project, on_delete=models.CASCADE)
 
+class AnalysisGroup(ModelWithGUID):
     name = models.TextField()
     description = models.TextField(null=True, blank=True)
 
+    project = models.ForeignKey('Project', on_delete=models.CASCADE)
     families = models.ManyToManyField(Family)
 
     def __unicode__(self):
-        return self.name
-"""
+        return self.name.strip()
+
+    def _compute_guid(self):
+        return 'AG%07d_%s' % (self.id, _slugify(str(self)))
+
+    class Meta:
+        unique_together = ('project', 'name')
+
+        json_fields = ['guid', 'name', 'description']
 

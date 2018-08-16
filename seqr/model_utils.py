@@ -7,7 +7,8 @@ from django.utils import timezone
 from seqr.views.utils.json_utils import _to_snake_case
 from xbrowse_server.base.models import Project as BaseProject, Family as BaseFamily, Individual as BaseIndividual, \
     ProjectTag as BaseProjectTag, VariantTag as BaseVariantTag, VariantNote as BaseVariantNote, \
-    VariantFunctionalData as BaseVariantFunctionalData, GeneNote as BaseGeneNote, AnalysedBy as BaseAnalysedBy
+    VariantFunctionalData as BaseVariantFunctionalData, GeneNote as BaseGeneNote, AnalysedBy as BaseAnalysedBy, \
+    FamilyGroup as BaseFamilyGroup
 from xbrowse_server.gene_lists.models import GeneList as BaseGeneList, GeneListItem as BaseGeneListItem
 
 SEQR_TO_XBROWSE_CLASS_MAPPING = {
@@ -22,6 +23,7 @@ SEQR_TO_XBROWSE_CLASS_MAPPING = {
     "LocusListGene": BaseGeneListItem,
     "GeneNote": BaseGeneNote,
     "FamilyAnalysedBy": BaseAnalysedBy,
+    "AnalysisGroup": BaseFamilyGroup,
 }
 
 _DELETED_FIELD = "__DELETED__"
@@ -67,15 +69,20 @@ SEQR_TO_XBROWSE_FIELD_MAPPING = {
     },
     "LocusList": {
         "created_by": "owner",
+        "last_modified_by": "last_updated",
     },
     "LocusListGene": {
         "locus_list": "gene_list",
+        "created_by": _DELETED_FIELD,
     },
     "GeneNote": {
         "created_by": "user",
     },
     "FamilyAnalysedBy": {
         "created_by": "user",
+    },
+    "AnalysisGroup": {
+        "created_by": _DELETED_FIELD,
     },
 }
 
@@ -184,11 +191,12 @@ def find_matching_xbrowse_model(seqr_model):
                 (Q(seqr_locus_list__isnull=True) &
                  Q(name=seqr_model.name) &
                  Q(description=seqr_model.description) &
+                 Q(owner=seqr_model.created_by) &
                  Q(is_public=seqr_model.is_public)))
         elif seqr_class_name == "LocusListGene":
             return BaseGeneListItem.objects.get(
                 gene_list=find_matching_xbrowse_model(seqr_model.locus_list),
-                description=seqr_model.description,
+                description=seqr_model.description or '',
                 gene_id=seqr_model.gene_id)
         elif seqr_class_name == "GeneNote":
             return BaseGeneNote.objects.get(
@@ -197,6 +205,12 @@ def find_matching_xbrowse_model(seqr_model):
             )
         elif seqr_class_name == "FamilyAnalysedBy":
             return BaseAnalysedBy.objects.get(seqr_family_analysed_by=seqr_model)
+        elif seqr_class_name == "AnalysisGroup":
+            return BaseFamilyGroup.objects.get(
+                Q(seqr_analysis_group=seqr_model) |
+                (Q(seqr_analysis_group__isnull=True) &
+                 Q(name=seqr_model.name) &
+                 Q(project__project_id=seqr_model.project.deprecated_project_id)))
     except Exception as e:
         logging.error("ERROR: when looking up xbrowse model for seqr %s model: %s" % (seqr_model, e))
         #traceback.print_exc()
@@ -215,6 +229,9 @@ def convert_seqr_kwargs_to_xbrowse_kwargs(seqr_model, **kwargs):
 
     if seqr_class_name == "Individual" and "family" in xbrowse_kwargs:
         xbrowse_kwargs["project"] = getattr(seqr_model, "family").project
+
+    if seqr_class_name in ["LocusList", "AnalysisGroup"] and 'name' in xbrowse_kwargs:
+        xbrowse_kwargs['slug'] = seqr_model.guid
 
     # handle foreign keys
     for key, value in xbrowse_kwargs.items():
@@ -235,8 +252,9 @@ def convert_seqr_kwargs_to_xbrowse_kwargs(seqr_model, **kwargs):
 
     # Explicitly add timestamps
     xbrowse_model_class = SEQR_TO_XBROWSE_CLASS_MAPPING.get(seqr_class_name)
-    if xbrowse_model_class and hasattr(xbrowse_model_class, 'date_saved') and 'date_saved' not in xbrowse_kwargs:
-        xbrowse_kwargs['date_saved'] = timezone.now()
+    for timestamp_key in ['date_saved', 'last_updated']:
+        if xbrowse_model_class and hasattr(xbrowse_model_class, timestamp_key) and timestamp_key not in xbrowse_kwargs:
+            xbrowse_kwargs[timestamp_key] = timezone.now()
 
     return xbrowse_kwargs
 

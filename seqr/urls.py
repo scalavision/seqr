@@ -57,6 +57,15 @@ from seqr.views.pages.staff.staff_pages import \
     seqr_stats_page, \
     users_page
 
+from seqr.views.apis.locus_list_api import \
+    locus_lists, \
+    locus_list_info, \
+    create_locus_list_handler, \
+    update_locus_list_handler, \
+    delete_locus_list_handler, \
+    add_project_locus_lists, \
+    delete_project_locus_lists
+
 from seqr.views.pages.staff.discovery_sheet import discovery_sheet
 from seqr.views.pages.staff.elasticsearch_status import elasticsearch_status
 from seqr.views.pages.staff.komp_export import komp_export
@@ -65,6 +74,7 @@ from seqr.views.pages.staff.komp_export import komp_export
 from seqr.views.apis.awesomebar_api import awesomebar_autocomplete_handler
 from seqr.views.apis.auth_api import login_required_error, API_LOGIN_REQUIRED_URL
 from seqr.views.apis.igv_api import fetch_igv_track
+from seqr.views.apis.analysis_group_api import update_analysis_group_handler, delete_analysis_group_handler
 from seqr.views.apis.project_api import create_project_handler, update_project_handler, delete_project_handler
 from seqr.views.apis.project_categories_api import update_project_categories_handler
 from seqr.views.utils.file_utils import save_temp_file
@@ -73,7 +83,8 @@ react_app_pages = [
     r'^$',
     'dashboard',
     'project/(?P<project_guid>[^/]+)/.*',
-    'gene_info/.*'
+    'gene_info/.*',
+    'gene_lists/.*',
 ]
 
 # NOTE: the actual url will be this with an '/api' prefix
@@ -111,6 +122,10 @@ api_endpoints = {
     'project/(?P<project_guid>[^/]+)/individual/(?P<individual_guid>[\w.|-]+)/phenotips_pdf': phenotips_pdf_handler,
     'project/(?P<project_guid>[^/]+)/individual/(?P<individual_guid>[\w.|-]+)/phenotips_edit': phenotips_edit_handler,
 
+    'project/(?P<project_guid>[^/]+)/analysis_groups/create': update_analysis_group_handler,
+    'project/(?P<project_guid>[^/]+)/analysis_groups/(?P<analysis_group_guid>[^/]+)/update': update_analysis_group_handler,
+    'project/(?P<project_guid>[^/]+)/analysis_groups/(?P<analysis_group_guid>[^/]+)/delete': delete_analysis_group_handler,
+
     'saved_variant/(?P<variant_guid>[^/]+)/transcripts': saved_variant_transcripts,
     'saved_variant/(?P<variant_guid>[^/]+)/update_tags': update_variant_tags_handler,
     'saved_variant/(?P<variant_guid>[^/]+)/note/create': create_variant_note_handler,
@@ -121,6 +136,14 @@ api_endpoints = {
     'gene_info/(?P<gene_id>[^/]+)/note/create': create_gene_note_handler,
     'gene_info/(?P<gene_id>[^/]+)/note/(?P<note_guid>[^/]+)/update': update_gene_note_handler,
     'gene_info/(?P<gene_id>[^/]+)/note/(?P<note_guid>[^/]+)/delete': delete_gene_note_handler,
+
+    'locus_lists': locus_lists,
+    'locus_lists/(?P<locus_list_guid>[^/]+)': locus_list_info,
+    'locus_lists/create': create_locus_list_handler,
+    'locus_lists/(?P<locus_list_guid>[^/]+)/update': update_locus_list_handler,
+    'locus_lists/(?P<locus_list_guid>[^/]+)/delete': delete_locus_list_handler,
+    'project/(?P<project_guid>[^/]+)/add_locus_lists': add_project_locus_lists,
+    'project/(?P<project_guid>[^/]+)/delete_locus_lists': delete_project_locus_lists,
 
     'awesomebar': awesomebar_autocomplete_handler,
 

@@ -2,7 +2,7 @@ import { combineReducers } from 'redux'
 import { SubmissionError } from 'redux-form'
 
 import { loadingReducer, createSingleObjectReducer, createObjectsByIdReducer, createSingleValueReducer } from 'redux/utils/reducerFactories'
-import { REQUEST_PROJECTS, RECEIVE_DATA } from 'redux/rootReducer'
+import { REQUEST_PROJECTS, RECEIVE_DATA, updateEntity } from 'redux/rootReducer'
 import { HttpRequestHelper } from 'shared/utils/httpRequestHelper'
 import { getProject, getProjectFamiliesByGuid } from 'pages/Project/selectors'
 import {
@@ -20,6 +20,8 @@ const RECEIVE_PROJECT_DETAILS = 'RECEIVE_PROJECT_DETAILS'
 const REQUEST_SAVED_VARIANTS = 'REQUEST_SAVED_VARIANTS'
 const RECEIVE_SAVED_VARIANTS = 'RECEIVE_SAVED_VARIANTS'
 const RECEIVE_SAVED_VARIANT_FAMILIES = 'RECEIVE_SAVED_VARIANT_FAMILIES'
+const RECEIVE_GENES = 'RECEIVE_GENES'
+
 
 // Data actions
 
@@ -70,6 +72,7 @@ export const loadProjectVariants = (familyGuid, variantGuid) => {
     dispatch({ type: REQUEST_SAVED_VARIANTS })
     new HttpRequestHelper(url,
       (responseJson) => {
+        dispatch({ type: RECEIVE_GENES, updatesById: responseJson.genesById })
         dispatch({ type: RECEIVE_SAVED_VARIANTS, updatesById: responseJson.savedVariants })
         if (expectedFamilyGuids) {
           dispatch({
@@ -149,6 +152,23 @@ export const addDataset = (values) => {
       },
     ).post(values)
   }
+}
+
+export const updateLocusLists = (values) => {
+  return (dispatch, getState) => {
+    const projectGuid = getState().currentProjectGuid
+    const action = values.delete ? 'delete' : 'add'
+    return new HttpRequestHelper(`/api/project/${projectGuid}/${action}_locus_lists`,
+      (responseJson) => {
+        dispatch({ type: RECEIVE_DATA, updatesById: { projectsByGuid: { [projectGuid]: responseJson } } })
+      },
+      (e) => { throw new SubmissionError({ _error: [e.message] }) },
+    ).post(values)
+  }
+}
+
+export const updateAnalysisGroup = (values) => {
+  return updateEntity(values, RECEIVE_DATA, `/api/project/${values.projectGuid}/analysis_groups`, 'analysisGroupGuid')
 }
 
 // Table actions
