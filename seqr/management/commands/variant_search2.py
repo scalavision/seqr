@@ -1,12 +1,16 @@
 import logging
 
+import elasticsearch
+import elasticsearch_dsl
+import redis
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.core.management.base import BaseCommand
-from django.db.models.query_utils import Q
-from tqdm import tqdm
+from django.db.models.query_utils import Q as Q_sql
+from elasticsearch_dsl import Q as Q_es
 
-from seqr.models import Project, Family, Sample
+
+from seqr.models import Project, Family, Sample, LocusListGene, LocusListInterval
 from seqr.views.utils.permissions_utils import check_permissions
 from xbrowse.core.constants import CLINVAR_ANNOTATION_DEFINITIONS
 
@@ -17,6 +21,11 @@ class Command(BaseCommand):
     help = 'Variant search'
 
     def add_arguments(self, parser):
+
+        parser.add_argument("--host", help="elasticsearch host", required=True)
+        parser.add_argument("--port", help="elasticsearch port", default=9200)
+
+        parser.add_argument("--genome-version", help="Search will be performed in this genome version", default=37)
 
         parser.add_argument("--user", help="user email. Run the search as this user (for testing permissions)")
 
@@ -47,8 +56,8 @@ class Command(BaseCommand):
         parser.add_argument("--variant", nargs="*", help="chrom-pos-ref-alt")
 
         # dataset type
-        parser.add_argument("--dataset-type", nargs="*", choices=["VARIANT", "SV"])
-        parser.add_argument("--sample-type", nargs="*", choices=["WES", "WGS"])
+        parser.add_argument("--dataset-type", nargs="*", choices=[Sample.DATASET_TYPE_VARIANT_CALLS, Sample.DATASET_TYPE_SV_CALLS])
+        parser.add_argument("--sample-type", nargs="*", choices=[Sample.SAMPLE_TYPE_WES, Sample.SAMPLE_TYPE_WGS])
         parser.add_argument("--variant-type", nargs="*", choices=["SNP", "INS", "DEL"])
 
         parser.add_argument("--dataset-type2", nargs="*", choices=["VARIANT", "SV"])
@@ -164,27 +173,26 @@ class Command(BaseCommand):
         variant_types = options["variant_type"]
 
         # allele frequencies
-        parser.add_argument("--this-callset-AC", type=int)
-        parser.add_argument("--this-callset-AF", type=float)
+        options["this_callset_AC"]
+        options["this_callset_AF"]
 
-        parser.add_argument("--g1k-AC", type=int)
-        parser.add_argument("--g1k-AF", type=float)
+        options["g1k_AC"]
+        options["g1k_AF"]
 
-        parser.add_argument("--exac-AC", type=int)
-        parser.add_argument("--exac-HH", type=int)
-        parser.add_argument("--exac-AF", type=float)
+        options["exac_AC"]
+        options["exac_HH"]
+        options["exac_AF"]
 
-        parser.add_argument("--gnomad-exomes-AC", type=int)
-        parser.add_argument("--gnomad-exomes-HH", type=int)
-        parser.add_argument("--gnomad-exomes-AF", type=float)
+        options["gnomad_exomes_AC"]
+        options["gnomad_exomes_HH"]
+        options["gnomad_exomes_AF"]
 
-        parser.add_argument("--gnomad-genomes-AC", type=int)
-        parser.add_argument("--gnomad-genomes-HH", type=int)
-        parser.add_argument("--gnomad-genomes-AF", type=float)
+        options["gnomad_genomes_AC"]
+        options["gnomad_genomes_HH"]
+        options["gnomad_genomes_AF"]
 
-        parser.add_argument("--topmed-AC", type=int)
-        parser.add_argument("--topmed-AF", type=float)
-
+        options["topmed_AC"]
+        options["topmed_AF"]
 
         # compute the set of samples to search
         query_filter = (
